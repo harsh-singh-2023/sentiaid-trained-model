@@ -13,7 +13,7 @@ It is built with Python, TensorFlow/Keras, and a FastAPI backend. The frontend i
 
 1.  **Clone the repository:**
     ```bash
-    git clone [https://github.com/YOUR-USERNAME/ASL-Alphabet-Recognizer.git](https://github.com/YOUR-USERNAME/ASL-Alphabet-Recognizer.git)
+    git clone [https://github.com/harsh-singh-2023/sentiaid-trained-model](https://github.com/harsh-singh-2023/sentiaid-trained-model.git)
     cd ASL-Alphabet-Recognizer
     ```
 
