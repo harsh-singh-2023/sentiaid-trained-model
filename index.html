@@ -3,59 +3,109 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Real-Time ASL Recognizer</title>
+    <title>SentiAid - Real-Time ASL Recognizer</title>
     <!-- We'll use Tailwind for styling to make it look good -->
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         /* A little custom style for the video feed */
         video {
-            transform: scaleX(-1); /* Flip the video horizontally */
+            transform: scaleX(-1); /* Flip the video horizontally (mirror mode) */
+        }
+        /* Blinking cursor for the word box */
+        #word-text-cursor {
+            animation: blink 1s step-end infinite;
+        }
+        @keyframes blink {
+            from, to { color: transparent }
+            50% { color: #fcd34d; } /* yellow-300 */
         }
     </style>
 </head>
-<body class="bg-gray-900 text-white flex items-center justify-center min-h-screen font-sans">
+<body class="bg-gray-900 text-white flex items-center justify-center min-h-screen font-sans p-4">
 
-    <div class="container mx-auto p-6 bg-gray-800 rounded-lg shadow-xl max-w-2xl text-center">
-        <h1 class="text-4xl font-bold mb-4 text-cyan-400">Real-Time ASL Recognizer</h1>
-        <p class="text-lg text-gray-300 mb-6">Hold up an ASL alphabet sign and click "Predict"</p>
-
-        <!-- Webcam Feed -->
-        <div class="relative bg-black rounded-md overflow-hidden shadow-lg mb-4" style="width: 640px; height: 480px;">
-            <video id="webcam" autoplay playsinline class="w-full h-full"></video>
-            <!-- A hidden canvas we use to capture the frame -->
-            <canvas id="canvas" class="hidden" width="640" height="480"></canvas>
+    <div class="container mx-auto p-6 bg-gray-800 rounded-2xl shadow-xl max-w-5xl">
+        <h1 class="text-4xl font-bold mb-6 text-center text-cyan-400">SentiAid - Real Time ASL Recognizer</h1>
+        
+        <div class="md:grid md:grid-cols-2 md:gap-8">
             
-            <!-- A box to guide the user's hand -->
-            <div class="absolute inset-0 flex items-center justify-center">
-                <div class="w-64 h-64 border-4 border-dashed border-cyan-400 opacity-75 rounded-lg"></div>
+            <!-- Left Column: Controls & Results -->
+            <div class="flex flex-col justify-between">
+                <div>
+                    <!-- Controls -->
+                    <div class="mb-4">
+                        <button id="toggleButton" class="w-full bg-cyan-500 hover:bg-cyan-600 text-white font-bold py-3 px-6 rounded-lg text-xl transition-all duration-300 shadow-lg transform hover:scale-105">
+                            Start Predicting
+                        </button>
+                    </div>
+
+                    <!-- Current Prediction -->
+                    <div class="bg-gray-700 p-6 rounded-lg mb-4 text-center shadow-inner">
+                        <h2 class="text-xl font-semibold mb-2 text-gray-300">CURRENT PREDICTION</h2>
+                        <p class="text-8xl font-mono font-bold text-yellow-300" id="prediction-text">---</p>
+                        <p class="text-lg text-gray-400 mt-2" id="confidence-text">Confidence: ---</p>
+                    </div>
+
+                    <!-- Word Builder -->
+                    <div class="bg-gray-700 p-6 rounded-lg shadow-inner">
+                        <h2 class="text-xl font-semibold mb-3 text-gray-300">YOUR WORD</h2>
+                        <!-- The "Text Box" -->
+                        <div class="bg-gray-900 rounded-md p-4 min-h-[60px] text-3xl font-mono text-yellow-300 break-words" id="word-box">
+                            <span id="word-text"></span><span id="word-text-cursor">|</span>
+                        </div>
+                        <!-- Word Controls -->
+                        <div class="grid grid-cols-3 gap-2 mt-4">
+                            <button id="addLetterButton" class="bg-green-500 hover:bg-green-600 text-white font-semibold py-2 px-4 rounded-md transition-all duration-200" disabled>
+                                Add Letter
+                            </button>
+                            <button id="spaceButton" class="bg-gray-500 hover:bg-gray-600 text-white font-semibold py-2 px-4 rounded-md transition-all duration-200">
+                                Add Space
+                            </button>
+                            <button id="clearWordButton" class="bg-red-500 hover:bg-red-600 text-white font-semibold py-2 px-4 rounded-md transition-all duration-200">
+                                Clear
+                            </button>
+                        </div>
+                    </div>
+                </div>
             </div>
-        </div>
 
-        <!-- Control Button -->
-        <button id="predictButton" class="bg-cyan-500 hover:bg-cyan-600 text-white font-bold py-3 px-8 rounded-full text-xl transition-all duration-300 shadow-lg transform hover:scale-105">
-            Predict
-        </button>
+            <!-- Right Column: Webcam -->
+            <div class="mt-6 md:mt-0">
+                <div class="relative bg-black rounded-lg overflow-hidden shadow-lg mx-auto" style="width: 100%; max-width: 640px; aspect-ratio: 4 / 3;">
+                    <video id="webcam" autoplay playsinline class="w-full h-full"></video>
+                    <!-- A hidden canvas we use to capture the frame -->
+                    <canvas id="canvas" class="hidden" width="640" height="480"></canvas>
+                    
+                    <!-- A box to guide the user's hand -->
+                    <div class="absolute inset-0 flex items-center justify-center pointer-events-none">
+                        <div class="w-3/4 h-3/4 border-4 border-dashed border-cyan-400 opacity-75 rounded-lg"></div>
+                    </div>
+                </div>
+            </div>
 
-        <!-- Prediction Result Area -->
-        <div id="result-container" class="mt-6 p-6 bg-gray-700 rounded-lg text-left hidden">
-            <h2 class="text-2xl font-semibold mb-2">Prediction:</h2>
-            <p class="text-6xl font-mono font-bold text-yellow-300" id="prediction-text">---</p>
-            <p class="text-lg text-gray-400 mt-2" id="confidence-text">Confidence: ---</p>
-        </div>
-    </div>
+        </div> <!-- End Grid -->
+    </div> <!-- End Container -->
 
     <script>
         // --- 1. Get Elements ---
         const video = document.getElementById('webcam');
         const canvas = document.getElementById('canvas');
-        const predictButton = document.getElementById('predictButton');
-        const resultContainer = document.getElementById('result-container');
+        const toggleButton = document.getElementById('toggleButton');
         const predictionText = document.getElementById('prediction-text');
         const confidenceText = document.getElementById('confidence-text');
+        const addLetterButton = document.getElementById('addLetterButton');
+        const spaceButton = document.getElementById('spaceButton');
+        const clearWordButton = document.getElementById('clearWordButton');
+        const wordText = document.getElementById('word-text');
+        const wordBox = document.getElementById('word-box');
 
-        // --- 2. Start Webcam ---
-        // This asks the user for camera permission
-        navigator.mediaDevices.getUserMedia({ video: true })
+        // --- 2. App State ---
+        let isPredicting = false;
+        let predictionLoop = null;
+        let currentPrediction = ""; // Store the last valid prediction
+        let currentWord = "";
+
+        // --- 3. Start Webcam ---
+        navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480 } })
             .then(stream => {
                 video.srcObject = stream;
             })
@@ -64,14 +114,11 @@
                 alert("Could not access webcam. Please allow camera permissions.");
             });
 
-        // --- 3. Set up Predict Button Click ---
-        predictButton.addEventListener('click', async () => {
-            // Show loading state
-            predictionText.textContent = "Loading...";
-            confidenceText.textContent = "Confidence: ---";
-            resultContainer.classList.remove('hidden');
+        // --- 4. Main Prediction Loop Function ---
+        const predictFrame = async () => {
+            if (!isPredicting) return; // Stop if the loop was cancelled
 
-            // --- 4. Capture Frame ---
+            // --- Capture Frame ---
             const context = canvas.getContext('2d');
             // Draw the *flipped* video frame onto the canvas
             context.save();
@@ -79,17 +126,13 @@
             context.drawImage(video, -canvas.width, 0, canvas.width, canvas.height);
             context.restore(); // Un-flip the context
 
-            // Get the image from the canvas as a 'blob' (a file-like object)
+            // Get the image from the canvas as a 'blob'
             canvas.toBlob(async (blob) => {
-                // --- 5. Send Image to API ---
-                
-                // Create a FormData object (like an HTML form)
-                // This is what our API expects for an 'UploadFile'
+                // --- Send Image to API ---
                 const formData = new FormData();
                 formData.append('image_file', blob, 'webcam_capture.jpg');
 
                 try {
-                    // Send the form data to our FastAPI server
                     const response = await fetch('http://127.0.0.1:8000/predict_image', {
                         method: 'POST',
                         body: formData
@@ -101,22 +144,101 @@
 
                     const data = await response.json();
                     
-                    // --- 6. Display Result ---
+                    // --- Display Result ---
                     if (data.predicted_letter) {
-                        predictionText.textContent = data.predicted_letter;
-                        confidenceText.textContent = `Confidence: ${(data.confidence * 100).toFixed(2)}%`;
+                        let letter = data.predicted_letter;
+                        let confidence = (data.confidence * 100).toFixed(2);
+                        
+                        // Clean up predictions
+                        if (letter === "del") letter = "Delete";
+                        if (letter === "nothing") letter = "---";
+
+                        predictionText.textContent = letter;
+                        confidenceText.textContent = `Confidence: ${confidence}%`;
+
+                        // Store the last valid prediction
+                        if (letter !== "---") {
+                            currentPrediction = data.predicted_letter; // Store the raw label ('del', 'space', 'A', etc.)
+                            addLetterButton.disabled = false;
+                        } else {
+                            currentPrediction = "";
+                            addLetterButton.disabled = true;
+                        }
+
                     } else if (data.error) {
                         predictionText.textContent = "Error";
                         confidenceText.textContent = data.error;
+                        currentPrediction = "";
+                        addLetterButton.disabled = true;
                     }
                 } catch (error) {
                     console.error("Fetch error:", error);
-                    predictionText.textContent = "Error";
-                    confidenceText.textContent = "Could not connect to API. Is it running?";
+                    predictionText.textContent = "API Error";
+                    confidenceText.textContent = "Could not connect to API.";
+                    currentPrediction = "";
+                    addLetterButton.disabled = true;
+                    stopPredicting(); // Stop the loop if the API connection fails
                 }
 
-            }, 'image/jpeg'); // Specify we want a JPG image
+            }, 'image/jpeg');
+        };
+
+        // --- 5. Control Functions ---
+        function startPredicting() {
+            isPredicting = true;
+            toggleButton.textContent = "Stop Predicting";
+            toggleButton.classList.remove('bg-cyan-500', 'hover:bg-cyan-600');
+            toggleButton.classList.add('bg-red-500', 'hover:bg-red-600');
+            predictionLoop = setInterval(predictFrame, 500); // Predict every 500ms
+        }
+
+        function stopPredicting() {
+            isPredicting = false;
+            toggleButton.textContent = "Start Predicting";
+            toggleButton.classList.remove('bg-red-500', 'hover:bg-red-600');
+            toggleButton.classList.add('bg-cyan-500', 'hover:bg-cyan-600');
+            clearInterval(predictionLoop);
+            predictionText.textContent = "---";
+            confidenceText.textContent = "Confidence: ---";
+            currentPrediction = "";
+            addLetterButton.disabled = true;
+        }
+
+        // --- 6. Event Listeners ---
+        toggleButton.addEventListener('click', () => {
+            if (isPredicting) {
+                stopPredicting();
+            } else {
+                startPredicting();
+            }
         });
+
+        addLetterButton.addEventListener('click', () => {
+            if (currentPrediction) {
+                if (currentPrediction === "del") {
+                    // Handle "delete"
+                    currentWord = currentWord.slice(0, -1);
+                } else if (currentPrediction === "space") {
+                    // Handle "space"
+                    currentWord += " ";
+                } else if (currentPrediction !== "nothing") {
+                    // Handle a letter
+                    currentWord += currentPrediction;
+                }
+                wordText.textContent = currentWord;
+            }
+        });
+        
+        spaceButton.addEventListener('click', () => {
+            currentWord += " ";
+            wordText.textContent = currentWord;
+        });
+
+        clearWordButton.addEventListener('click', () => {
+            currentWord = "";
+            wordText.textContent = currentWord;
+        });
+
     </script>
 </body>
 </html>
