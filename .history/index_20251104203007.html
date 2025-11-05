@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Real-Time ASL Recognizer</title>
+    <!-- We'll use Tailwind for styling to make it look good -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* A little custom style for the video feed */
+        video {
+            transform: scaleX(-1); /* Flip the video horizontally */
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-white flex items-center justify-center min-h-screen font-sans">
+
+    <div class="container mx-auto p-6 bg-gray-800 rounded-lg shadow-xl max-w-2xl text-center">
+        <h1 class="text-4xl font-bold mb-4 text-cyan-400">Real-Time ASL Recognizer</h1>
+        <p class="text-lg text-gray-300 mb-6">Hold up an ASL alphabet sign and click "Predict"</p>
+
+        <!-- Webcam Feed -->
+        <div class="relative bg-black rounded-md overflow-hidden shadow-lg mb-4" style="width: 640px; height: 480px;">
+            <video id="webcam" autoplay playsinline class="w-full h-full"></video>
+            <!-- A hidden canvas we use to capture the frame -->
+            <canvas id="canvas" class="hidden" width="640" height="480"></canvas>
+            
+            <!-- A box to guide the user's hand -->
+            <div class="absolute inset-0 flex items-center justify-center">
+                <div class="w-64 h-64 border-4 border-dashed border-cyan-400 opacity-75 rounded-lg"></div>
+            </div>
+        </div>
+
+        <!-- Control Button -->
+        <button id="predictButton" class="bg-cyan-500 hover:bg-cyan-600 text-white font-bold py-3 px-8 rounded-full text-xl transition-all duration-300 shadow-lg transform hover:scale-105">
+            Predict
+        </button>
+
+        <!-- Prediction Result Area -->
+        <div id="result-container" class="mt-6 p-6 bg-gray-700 rounded-lg text-left hidden">
+            <h2 class="text-2xl font-semibold mb-2">Prediction:</h2>
+            <p class="text-6xl font-mono font-bold text-yellow-300" id="prediction-text">---</p>
+            <p class="text-lg text-gray-400 mt-2" id="confidence-text">Confidence: ---</p>
+        </div>
+    </div>
+
+    <script>
+        // --- 1. Get Elements ---
+        const video = document.getElementById('webcam');
+        const canvas = document.getElementById('canvas');
+        const predictButton = document.getElementById('predictButton');
+        const resultContainer = document.getElementById('result-container');
+        const predictionText = document.getElementById('prediction-text');
+        const confidenceText = document.getElementById('confidence-text');
+
+        // --- 2. Start Webcam ---
+        // This asks the user for camera permission
+        navigator.mediaDevices.getUserMedia({ video: true })
+            .then(stream => {
+                video.srcObject = stream;
+            })
+            .catch(err => {
+                console.error("Error accessing webcam: ", err);
+                alert("Could not access webcam. Please allow camera permissions.");
+            });
+
+        // --- 3. Set up Predict Button Click ---
+        predictButton.addEventListener('click', async () => {
+            // Show loading state
+            predictionText.textContent = "Loading...";
+            confidenceText.textContent = "Confidence: ---";
+            resultContainer.classList.remove('hidden');
+
+            // --- 4. Capture Frame ---
+            const context = canvas.getContext('2d');
+            // Draw the *flipped* video frame onto the canvas
+            context.save();
+            context.scale(-1, 1); // Flip horizontally
+            context.drawImage(video, -canvas.width, 0, canvas.width, canvas.height);
+            context.restore(); // Un-flip the context
+
+            // Get the image from the canvas as a 'blob' (a file-like object)
+            canvas.toBlob(async (blob) => {
+                // --- 5. Send Image to API ---
+                
+                // Create a FormData object (like an HTML form)
+                // This is what our API expects for an 'UploadFile'
+                const formData = new FormData();
+                formData.append('image_file', blob, 'webcam_capture.jpg');
+
+                try {
+                    // Send the form data to our FastAPI server
+                    const response = await fetch('http://127.0.0.1:8000/predict_image', {
+                        method: 'POST',
+                        body: formData
+                    });
+
+                    if (!response.ok) {
+                        throw new Error(`API Error: ${response.statusText}`);
+                    }
+
+                    const data = await response.json();
+                    
+                    // --- 6. Display Result ---
+                    if (data.predicted_letter) {
+                        predictionText.textContent = data.predicted_letter;
+                        confidenceText.textContent = `Confidence: ${(data.confidence * 100).toFixed(2)}%`;
+                    } else if (data.error) {
+                        predictionText.textContent = "Error";
+                        confidenceText.textContent = data.error;
+                    }
+                } catch (error) {
+                    console.error("Fetch error:", error);
+                    predictionText.textContent = "Error";
+                    confidenceText.textContent = "Could not connect to API. Is it running?";
+                }
+
+            }, 'image/jpeg'); // Specify we want a JPG image
+        });
+    </script>
+</body>
+</html>

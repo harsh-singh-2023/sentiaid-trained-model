@@ -1,0 +1,24 @@
+# Ignore the Python virtual environment
+sign_env/
+
+# Ignore the massive Kaggle dataset
+asl_alphabet_train/
+
+# Ignore the WLASL dataset and data
+WLASL/
+WLASL_data/
+
+# Ignore the Unvoiced repo
+Unvoiced/
+
+# Ignore the dummy data folder
+data/
+
+# Ignore compiled Python files
+__pycache__/
+*.pyc
+
+# Ignore large model files
+*.h5
+*.keras
+*.pb
